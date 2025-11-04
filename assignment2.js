@@ -205,11 +205,6 @@ async function getBalance() {
 // Main execution
 async function main() {
   try {
-    console.log('╔══════════════════════════════════════════════╗');
-    console.log('║   Lightning Network Daemon (LND) Client     ║');
-    console.log('║   Network:', config.network.padEnd(30), '║');
-    console.log('╚══════════════════════════════════════════════╝');
-
     // 1. Get node information
     await getNodeInfo();
 
