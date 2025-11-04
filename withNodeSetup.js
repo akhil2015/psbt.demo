@@ -18,19 +18,19 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Setup LND Docker container
 async function setupLNDDocker() {
-  console.log('\n🚀 Setting up LND Docker container...\n');
+  console.log('\nSetting up LND Docker container...\n');
 
   // Create data directory
   if (!fs.existsSync(LND_DIR)) {
     fs.mkdirSync(LND_DIR, { recursive: true });
-    console.log('✓ Created LND data directory:', LND_DIR);
+    console.log('Created LND data directory:', LND_DIR);
   }
 
   // Check if container already exists
   try {
     const { stdout } = await execAsync(`docker ps -a --filter name=${DOCKER_CONTAINER} --format "{{.Names}}"`);
     if (stdout.trim() === DOCKER_CONTAINER) {
-      console.log('✓ Container already exists, removing old container...');
+      console.log('Existing container found, removing it...');
       await execAsync(`docker rm -f ${DOCKER_CONTAINER}`);
     }
   } catch (error) {
@@ -38,8 +38,8 @@ async function setupLNDDocker() {
   }
 
   // Run LND container
-  console.log('✓ Starting LND container on testnet...');
-  
+  console.log('Starting LND container on testnet...');
+
   const dockerCmd = `docker run -d \
     --name=${DOCKER_CONTAINER} \
     -v ${LND_DIR}:/root/.lnd \
@@ -59,13 +59,13 @@ async function setupLNDDocker() {
     --no-macaroons=false`;
 
   await execAsync(dockerCmd.replace(/\s+/g, ' '));
-  
-  console.log('✓ LND container started successfully!');
-  console.log('⏳ Waiting for LND to initialize (30 seconds)...');
+
+  console.log('LND container started.');
+  console.log('Waiting for LND to initialize (30 seconds)...');
   await sleep(30000);
 
   // Create wallet
-  console.log('\n📝 Creating LND wallet...');
+  console.log('\nCreating LND wallet...');
   try {
     const createWallet = spawn('docker', [
       'exec', '-i', DOCKER_CONTAINER,
@@ -82,25 +82,25 @@ async function setupLNDDocker() {
 
     await new Promise((resolve) => {
       createWallet.on('close', () => {
-        console.log('✓ Wallet created successfully!');
+        console.log('Wallet created (or already exists).');
         resolve();
       });
     });
   } catch (error) {
-    console.log('Note: Wallet may already exist');
+    console.log('Wallet creation skipped or already exists.');
   }
 
-  console.log('⏳ Waiting for wallet to unlock (10 seconds)...');
+  console.log('Waiting for wallet to unlock (10 seconds)...');
   await sleep(10000);
 
   // Copy TLS cert and macaroon from container
-  console.log('\n📋 Copying authentication files...');
-  
+  console.log('\nCopying authentication files...');
+
   await execAsync(`docker cp ${DOCKER_CONTAINER}:/root/.lnd/tls.cert ${LND_DIR}/tls.cert`);
   await execAsync(`docker cp ${DOCKER_CONTAINER}:/root/.lnd/data/chain/bitcoin/testnet/admin.macaroon ${LND_DIR}/admin.macaroon`);
-  
-  console.log('✓ Authentication files copied');
-  console.log('\n✅ LND setup complete!\n');
+
+  console.log('Authentication files copied.');
+  console.log('\nLND setup complete.\n');
 }
 
 // LND REST API Client
@@ -185,17 +185,13 @@ class LNDClient {
 
 // Main execution
 async function main() {
-  console.log('╔══════════════════════════════════════════════╗');
-  console.log('║  Lightning Network (LND) Node Setup & Test   ║');
-  console.log('╚══════════════════════════════════════════════╝');
-
   try {
     // Check Docker availability
     try {
       await execAsync('docker --version');
     } catch (error) {
-      console.error('❌ Docker is not installed. Please install Docker first.');
-      console.error('Visit: https://docs.docker.com/get-docker/');
+      console.error('Docker is not installed. Please install Docker first.');
+      console.error('See: https://docs.docker.com/get-docker/');
       process.exit(1);
     }
 
@@ -204,68 +200,61 @@ async function main() {
 
     // Initialize client
     const lnd = new LNDClient();
-
-    // Test connection and operations
-    console.log('\n═══════════════════════════════════════════════\n');
-    console.log('🔍 Testing LND Connection & Operations\n');
-    console.log('═══════════════════════════════════════════════\n');
-
     // Get node info
-    console.log('1️⃣  Getting Node Information...');
+    console.log('Getting node information...');
     const info = await lnd.getInfo();
-    console.log('   ✓ Node Alias:', info.alias || 'N/A');
-    console.log('   ✓ Identity:', info.identity_pubkey?.substring(0, 20) + '...');
-    console.log('   ✓ Network:', info.chains?.[0]?.network || 'testnet');
-    console.log('   ✓ Synced:', info.synced_to_chain);
-    console.log('   ✓ Block Height:', info.block_height);
-    console.log('   ✓ Active Channels:', info.num_active_channels);
+    console.log('  Alias:', info.alias || 'N/A');
+    console.log('  Identity:', info.identity_pubkey?.substring(0, 20) + '...');
+    console.log('  Network:', info.chains?.[0]?.network || 'testnet');
+    console.log('  Synced:', info.synced_to_chain);
+    console.log('  Block Height:', info.block_height);
+    console.log('  Active Channels:', info.num_active_channels);
 
     // Get balance
-    console.log('\n2️⃣  Getting Wallet Balance...');
+    console.log('\nGetting wallet balance...');
     const balance = await lnd.getBalance();
-    console.log('   ✓ Local Balance:', balance.local_balance?.sat || '0', 'sats');
-    console.log('   ✓ Remote Balance:', balance.remote_balance?.sat || '0', 'sats');
+    console.log('  Local Balance:', balance.local_balance?.sat || '0', 'sats');
+    console.log('  Remote Balance:', balance.remote_balance?.sat || '0', 'sats');
 
     // Create invoice
-    console.log('\n3️⃣  Creating Lightning Invoice...');
+    console.log('\nCreating a Lightning invoice...');
     const invoice = await lnd.createInvoice(1000, 'Test invoice from Node.js', 3600);
-    console.log('   ✓ Payment Request:', invoice.payment_request.substring(0, 50) + '...');
-    console.log('   ✓ Amount:', '1000 sats');
-    console.log('   ✓ Memo:', 'Test invoice from Node.js');
+    console.log('  Payment Request:', invoice.payment_request.substring(0, 50) + '...');
+    console.log('  Amount: 1000 sats');
+    console.log('  Memo: Test invoice from Node.js');
 
     // Decode payment request
-    console.log('\n4️⃣  Decoding Payment Request...');
+    console.log('\nDecoding payment request...');
     const decoded = await lnd.decodePayReq(invoice.payment_request);
-    console.log('   ✓ Destination:', decoded.destination?.substring(0, 20) + '...');
-    console.log('   ✓ Payment Hash:', decoded.payment_hash?.substring(0, 20) + '...');
-    console.log('   ✓ Description:', decoded.description);
-    console.log('   ✓ Amount:', decoded.num_satoshis, 'sats');
+    console.log('  Destination:', decoded.destination?.substring(0, 20) + '...');
+    console.log('  Payment Hash:', decoded.payment_hash?.substring(0, 20) + '...');
+    console.log('  Description:', decoded.description);
+    console.log('  Amount:', decoded.num_satoshis, 'sats');
 
     // Lookup invoice
-    console.log('\n5️⃣  Looking up Invoice Status...');
+    console.log('\nLooking up invoice status...');
     const invoiceStatus = await lnd.lookupInvoice(invoice.r_hash);
-    console.log('   ✓ State:', invoiceStatus.state);
-    console.log('   ✓ Settled:', invoiceStatus.settled);
+    console.log('  State:', invoiceStatus.state);
+    console.log('  Settled:', invoiceStatus.settled);
 
-    console.log('\n═══════════════════════════════════════════════');
-    console.log('\n✅ All operations completed successfully!\n');
+    console.log('\nAll operations completed.');
 
-    console.log('📌 Useful Information:');
-    console.log('   • Data Directory:', LND_DIR);
-    console.log('   • REST API:', `https://localhost:${LND_REST_PORT}`);
-    console.log('   • RPC Port:', LND_RPC_PORT);
-    console.log('   • Network:', 'Bitcoin Testnet');
-    console.log('\n📝 To interact with your node:');
-    console.log(`   docker exec -it ${DOCKER_CONTAINER} lncli --network=testnet getinfo`);
-    console.log('\n🛑 To stop the node:');
-    console.log(`   docker stop ${DOCKER_CONTAINER}`);
-    console.log('\n🗑️  To remove everything:');
-    console.log(`   docker rm -f ${DOCKER_CONTAINER} && rm -rf ${LND_DIR}`);
+    console.log('\nUseful information:');
+    console.log('  Data Directory:', LND_DIR);
+    console.log('  REST API:', `https://localhost:${LND_REST_PORT}`);
+    console.log('  RPC Port:', LND_RPC_PORT);
+    console.log('  Network: Bitcoin Testnet');
+    console.log('\nTo interact with your node:');
+    console.log(`  docker exec -it ${DOCKER_CONTAINER} lncli --network=testnet getinfo`);
+    console.log('\nTo stop the node:');
+    console.log(`  docker stop ${DOCKER_CONTAINER}`);
+    console.log('\nTo remove everything:');
+    console.log(`  docker rm -f ${DOCKER_CONTAINER} && rm -rf ${LND_DIR}`);
     console.log('\n');
 
   } catch (error) {
-    console.error('\n❌ Error:', error.message);
-    console.error('\n💡 Make sure Docker is running and try again.');
+    console.error('\nError:', error.message);
+    console.error('Make sure Docker is running and try again.');
     process.exit(1);
   }
 }
